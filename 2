@@ -1,0 +1,375 @@
+got it — here’s everything you need in one go. four code drops:
+
+1) core/llm.py → ADD these classes + helpers (append to the file)
+# === P2 UI/UX: Prompts & helpers (append to core/llm.py) ===
+from pydantic import BaseModel
+
+class UIReactPromptInput(BaseModel):
+    description: str
+    constraints: str = ""
+    notes: str = ""
+
+class UIReactPrompt(Prompt[UIReactPromptInput, str]):
+    system_prompt = """
+    You are a senior frontend engineer. Generate a single React component using functional components + hooks.
+    Use Tailwind CSS classes. No external libs. No conversational text.
+    Output MUST be a single ```tsx code fence with a default-exported component named GeneratedUI.
+    Component requirements:
+    - Self-contained, no external data; mock any data inline.
+    - Structure: responsive, accessible (aria labels), semantic HTML.
+    - Keep styles via Tailwind classes only.
+    """
+    user_prompt = """
+    Description:
+    {{ description }}
+    {% if constraints %}Constraints: {{ constraints }}{% endif %}
+    {% if notes %}Notes: {{ notes }}{% endif %}
+
+    Provide ONLY the code in a single ```tsx block.
+    """
+    class LLMSettings(BaseModel):
+        temperature: float = 0.6
+    llm_settings: LLMSettings = LLMSettings()
+
+class UIHTMLPromptInput(BaseModel):
+    description: str
+    constraints: str = ""
+    notes: str = ""
+
+class UIHTMLPrompt(Prompt[UIHTMLPromptInput, str]):
+    system_prompt = """
+    You are a senior UI developer. Generate a single-page HTML document with inline <style> only.
+    Use modern, accessible, responsive layout (CSS Grid/Flex), dark theme friendly.
+    No external links. No conversational text. Output MUST be a single ```html code fence.
+    """
+    user_prompt = """
+    Description:
+    {{ description }}
+    {% if constraints %}Constraints: {{ constraints }}{% endif %}
+    {% if notes %}Notes: {{ notes }}{% endif %}
+
+    Provide ONLY the code in a single ```html block.
+    """
+    class LLMSettings(BaseModel):
+        temperature: float = 0.6
+    llm_settings: LLMSettings = LLMSettings()
+
+class UIDesignCritiqueInput(BaseModel):
+    description: str
+    generated_type: str  # "react" | "html"
+    generated_code: str
+
+class UIDesignCritiquePrompt(Prompt[UIDesignCritiqueInput, str]):
+    system_prompt = """
+    You are a UX lead. Provide a short, prioritized critique (max 10 bullets)
+    using Nielsen heuristics & WCAG basics. Then propose concrete improvements,
+    and OPTIONAL code diffs (concise). Output only markdown bullets and code fences if needed.
+    """
+    user_prompt = """
+    Type: {{ generated_type }}
+    Code:
+    ```
+    {{ generated_code }}
+    ```
+    Description: {{ description }}
+    """
+    class LLMSettings(BaseModel):
+        temperature: float = 0.4
+    llm_settings: LLMSettings = LLMSettings()
+
+class UIFigmaJSONInput(BaseModel):
+    description: str
+
+class UIFigmaJSONPrompt(Prompt[UIFigmaJSONInput, str]):
+    system_prompt = """
+    Produce a minimal Figma-like JSON describing frames, groups, text, and rectangles
+    with x,y,width,height,fill,children. Output ONLY a single ```json block.
+    Example shape:
+    {
+      "document": {
+        "name": "Page 1",
+        "children": [
+          {
+            "type": "FRAME", "name": "Screen",
+            "layout": {"width": 1440, "height": 1024},
+            "children": [
+              {"type": "RECTANGLE","name":"Header","x":0,"y":0,"width":1440,"height":80,"fill":"#111827"},
+              {"type": "TEXT","name":"Title","x":40,"y":24,"width":400,"height":32,"characters":"Dashboard"}
+            ]
+          }
+        ]
+      }
+    }
+    """
+    user_prompt = """
+    Description:
+    {{ description }}
+    """
+    class LLMSettings(BaseModel):
+        temperature: float = 0.5
+    llm_settings: LLMSettings = LLMSettings()
+
+# --- Async helpers ---
+import asyncio
+
+async def generate_ui_react(description: str, constraints: str = "", notes: str = "") -> str:
+    prompt = UIReactPrompt(UIReactPromptInput(description=description, constraints=constraints, notes=notes))
+    llm = get_ragbits_llm_client()
+    return await llm.generate(prompt=prompt)
+
+async def generate_ui_html(description: str, constraints: str = "", notes: str = "") -> str:
+    prompt = UIHTMLPrompt(UIHTMLPromptInput(description=description, constraints=constraints, notes=notes))
+    llm = get_ragbits_llm_client()
+    return await llm.generate(prompt=prompt)
+
+async def critique_ui(description: str, generated_type: str, generated_code: str) -> str:
+    prompt = UIDesignCritiquePrompt(UIDesignCritiqueInput(description=description, generated_type=generated_type, generated_code=generated_code))
+    llm = get_ragbits_llm_client()
+    return await llm.generate(prompt=prompt)
+
+async def generate_figma_json(description: str) -> str:
+    prompt = UIFigmaJSONPrompt(UIFigmaJSONInput(description=description))
+    llm = get_ragbits_llm_client()
+    return await llm.generate(prompt=prompt)
+
+2) core/agents.py → ADD this agent class (append to the file)
+# === P2 UI/UX: Agent facade (append to core/agents.py) ===
+from ragbits.core.llms import LiteLLM
+from ragbits.core.prompt import Prompt
+
+class RagbitsUIUXAgent(Agent):
+    def __init__(self, llm: LiteLLM):
+        class BaseAgentPrompt(Prompt[AgentBaseInput]):
+            system_prompt = "You are a versatile UI/UX generator."
+            user_prompt = "{{ query }}"
+        super().__init__(llm=llm, prompt=BaseAgentPrompt)
+
+    async def generate_react(self, description: str, constraints: str = "", notes: str = "") -> str:
+        from core.llm import generate_ui_react
+        return await generate_ui_react(description, constraints, notes)
+
+    async def generate_html(self, description: str, constraints: str = "", notes: str = "") -> str:
+        from core.llm import generate_ui_html
+        return await generate_ui_html(description, constraints, notes)
+
+    async def critique(self, description: str, generated_type: str, generated_code: str) -> str:
+        from core.llm import critique_ui
+        return await critique_ui(description, generated_type, generated_code)
+
+    async def figma_json(self, description: str) -> str:
+        from core.llm import generate_figma_json
+        return await generate_figma_json(description)
+
+3) core/neo4j_handler.py → ADD this store method (append to the class)
+# === P2 UI/UX: Neo4j storage (append inside Neo4jHandler in core/neo4j_handler.py) ===
+def store_uiux_event(self, event_id: str, description: str, output_type: str,
+                     generated_code: str, critique: str, figma_json: str, timestamp: str) -> bool:
+    if not self.driver:
+        print("Neo4j driver not initialized. Cannot store data.")
+        return False
+    with self.driver.session() as session:
+        try:
+            query = """
+            CREATE (u:UIUXEvent {
+                id: $event_id,
+                description: $description,
+                output_type: $output_type,
+                generated_code: $generated_code,
+                critique: $critique,
+                figma_json: $figma_json,
+                timestamp: datetime($timestamp),
+                type: "UIUX"
+            })
+            RETURN u.id
+            """
+            session.write_transaction(lambda tx: tx.run(
+                query,
+                event_id=event_id,
+                description=description,
+                output_type=output_type,
+                generated_code=generated_code,
+                critique=critique,
+                figma_json=figma_json,
+                timestamp=timestamp
+            ).single()[0])
+            print(f"UI/UX event {event_id} stored successfully in Neo4j.")
+            return True
+        except Exception as e:
+            print(f"Error storing UI/UX event in Neo4j: {e}")
+            return False
+
+4) pages/7_UI_UX_Generator.py → NEW FILE
+# pages/7_UI_UX_Generator.py
+import streamlit as st
+import asyncio
+import uuid
+from datetime import datetime
+from components.ui_styles import apply_custom_styles
+from core.llm import get_ragbits_llm_client
+from core.agents import RagbitsUIUXAgent
+from core.neo4j_handler import Neo4jHandler
+import streamlit.components.v1 as components
+
+st.set_page_config(page_title="GenAI UI/UX Generator", page_icon="🎨", layout="wide")
+apply_custom_styles()
+
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if not st.session_state.authenticated:
+    st.warning("Please log in to access this page.")
+    st.stop()
+
+st.header("GenAI UI/UX Generator (P2)")
+st.markdown("---")
+
+# init resources
+if "ragbits_llm_uiux" not in st.session_state:
+    st.session_state.ragbits_llm_uiux = get_ragbits_llm_client()
+if "uiux_agent" not in st.session_state:
+    st.session_state.uiux_agent = RagbitsUIUXAgent(llm=st.session_state.ragbits_llm_uiux)
+if "neo4j_handler_uiux" not in st.session_state:
+    st.session_state.neo4j_handler_uiux = Neo4jHandler()
+
+# session state
+if "ui_desc" not in st.session_state: st.session_state.ui_desc = ""
+if "ui_constraints" not in st.session_state: st.session_state.ui_constraints = "mobile-first, accessible, dark theme"
+if "ui_notes" not in st.session_state: st.session_state.ui_notes = ""
+if "ui_output_type" not in st.session_state: st.session_state.ui_output_type = "React + Tailwind"
+if "ui_generated_code" not in st.session_state: st.session_state.ui_generated_code = ""
+if "ui_critique" not in st.session_state: st.session_state.ui_critique = ""
+if "ui_figma_json" not in st.session_state: st.session_state.ui_figma_json = ""
+if "ui_last_details" not in st.session_state: st.session_state.ui_last_details = None
+
+col1, col2 = st.columns([0.65, 0.35])
+with col1:
+    st.subheader("1) Describe the UI")
+    st.session_state.ui_desc = st.text_area(
+        "e.g., Dashboard with header, left nav, cards, table, filters, and responsive layout.",
+        value=st.session_state.ui_desc, height=160, key="ui_desc_input"
+    )
+    st.session_state.ui_constraints = st.text_input("Constraints (optional):",
+        value=st.session_state.ui_constraints, key="ui_constraints_input")
+    st.session_state.ui_notes = st.text_area("Notes (optional):",
+        value=st.session_state.ui_notes, height=90, key="ui_notes_input")
+
+with col2:
+    st.subheader("2) Output")
+    st.session_state.ui_output_type = st.radio(
+        "Choose output:",
+        ["React + Tailwind", "HTML + CSS"],
+        index=0 if st.session_state.ui_output_type == "React + Tailwind" else 1
+    )
+    do_critique = st.checkbox("Also generate design critique", value=True)
+    do_figma = st.checkbox("Export Figma-like JSON", value=True)
+
+st.markdown("---")
+generate = st.button("Generate UI")
+if generate and st.session_state.ui_desc.strip():
+    st.session_state.ui_generated_code = ""
+    st.session_state.ui_critique = ""
+    st.session_state.ui_figma_json = ""
+    st.session_state.ui_last_details = None
+
+    with st.spinner("Generating UI..."):
+        if st.session_state.ui_output_type == "React + Tailwind":
+            raw = asyncio.run(st.session_state.uiux_agent.generate_react(
+                st.session_state.ui_desc,
+                st.session_state.ui_constraints,
+                st.session_state.ui_notes
+            ))
+            block_tag = "```tsx"
+            gen_type = "react"
+        else:
+            raw = asyncio.run(st.session_state.uiux_agent.generate_html(
+                st.session_state.ui_desc,
+                st.session_state.ui_constraints,
+                st.session_state.ui_notes
+            ))
+            block_tag = "```html"
+            gen_type = "html"
+
+        # Extract code fence
+        code = raw
+        if block_tag in raw:
+            code = raw.split(block_tag, 1)[1].split("```", 1)[0].strip()
+        elif "```" in raw:
+            code = raw.split("```", 1)[1].split("```", 1)[0].strip()
+
+        st.session_state.ui_generated_code = code
+
+        if do_critique:
+            st.session_state.ui_critique = asyncio.run(
+                st.session_state.uiux_agent.critique(st.session_state.ui_desc, gen_type, code)
+            )
+        if do_figma:
+            figma_raw = asyncio.run(st.session_state.uiux_agent.figma_json(st.session_state.ui_desc))
+            if "```json" in figma_raw:
+                figma_raw = figma_raw.split("```json",1)[1].split("```",1)[0].strip()
+            elif "```" in figma_raw:
+                figma_raw = figma_raw.split("```",1)[1].split("```",1)[0].strip()
+            st.session_state.ui_figma_json = figma_raw
+
+        st.success("UI generated!")
+
+        # Save minimal event to Neo4j
+        event_id = str(uuid.uuid4())
+        st.session_state.ui_last_details = {
+            "event_id": event_id,
+            "description": st.session_state.ui_desc,
+            "output_type": st.session_state.ui_output_type,
+            "timestamp": datetime.now().isoformat()
+        }
+        if hasattr(st.session_state.neo4j_handler_uiux, "store_uiux_event"):
+            st.session_state.neo4j_handler_uiux.store_uiux_event(
+                event_id=event_id,
+                description=st.session_state.ui_desc,
+                output_type=st.session_state.ui_output_type,
+                generated_code=st.session_state.ui_generated_code,
+                critique=st.session_state.ui_critique,
+                figma_json=st.session_state.ui_figma_json,
+                timestamp=st.session_state.ui_last_details["timestamp"]
+            )
+
+# Display
+if st.session_state.ui_generated_code:
+    st.subheader("Generated Code")
+    lang = "tsx" if st.session_state.ui_output_type.startswith("React") else "html"
+    st.code(st.session_state.ui_generated_code, language=lang)
+
+    st.download_button(
+        "Download Generated Code",
+        data=st.session_state.ui_generated_code.encode("utf-8"),
+        file_name="GeneratedUI." + ("tsx" if lang=="tsx" else "html"),
+        mime="text/plain"
+    )
+
+    # Live preview for HTML only
+    if st.session_state.ui_output_type == "HTML + CSS":
+        st.subheader("Live Preview")
+        components.html(st.session_state.ui_generated_code, height=700, scrolling=True)
+    else:
+        st.info("React preview isn't executed in Streamlit; copy the component into your React app to run it.")
+
+if st.session_state.ui_critique:
+    st.subheader("Design Critique & Improvements")
+    st.markdown(st.session_state.ui_critique)
+
+if st.session_state.ui_figma_json:
+    st.subheader("Figma-like JSON")
+    st.code(st.session_state.ui_figma_json, language="json")
+    st.download_button(
+        "Download Figma-like JSON",
+        data=st.session_state.ui_figma_json.encode("utf-8"),
+        file_name="ui_design.figma.json",
+        mime="application/json"
+    )
+
+Final notes
+
+No need to change main.py right now (you said not to). Streamlit will auto-list pages/7_UI_UX_Generator.py in the sidebar.
+
+Make sure components/, core/, pages/ have __init__.py (empty) so imports resolve.
+
+Run: streamlit run main.py.
+
+want me to also generate a quick patch that creates missing __init__.py and verifies imports?
