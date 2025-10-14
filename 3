@@ -1,0 +1,150 @@
+Perfect — let’s walk through a live example of Phase-2, Feature 4 (GenAI-Powered UI/UX Generator) so you can picture exactly how it works inside Vulcanus.
+
+🎨 Example: “Sales Dashboard UI”
+Step 1: Input
+
+You open GenAI UI/UX Generator (P2) page and type:
+
+Description:
+
+A responsive sales dashboard with a top navigation bar, a left sidebar menu, 
+three KPI cards (Revenue, Orders, Customers), a data table of recent transactions, 
+and a line chart placeholder.
+
+
+Constraints:
+
+Mobile-first, dark theme, accessible design
+
+
+Notes:
+
+Keep the layout clean, use semantic HTML, avoid clutter
+
+Step 2: Output Option
+
+Choose React + Tailwind.
+
+Tick ✅ Design Critique.
+
+Tick ✅ Figma JSON Export.
+
+Step 3: Generated React + Tailwind Code (snippet)
+import React from "react";
+
+export default function GeneratedUI() {
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+      <header className="bg-gray-800 p-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold">Sales Dashboard</h1>
+        <nav>
+          <ul className="flex space-x-4">
+            <li><a href="#" className="hover:text-yellow-400">Home</a></li>
+            <li><a href="#" className="hover:text-yellow-400">Reports</a></li>
+            <li><a href="#" className="hover:text-yellow-400">Settings</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div className="flex flex-1">
+        <aside className="w-64 bg-gray-800 p-4 hidden md:block">
+          <ul className="space-y-2">
+            <li><a href="#" className="block p-2 rounded hover:bg-gray-700">Overview</a></li>
+            <li><a href="#" className="block p-2 rounded hover:bg-gray-700">Customers</a></li>
+            <li><a href="#" className="block p-2 rounded hover:bg-gray-700">Products</a></li>
+          </ul>
+        </aside>
+
+        <main className="flex-1 p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-800 p-4 rounded-lg">Revenue: $50,000</div>
+            <div className="bg-gray-800 p-4 rounded-lg">Orders: 120</div>
+            <div className="bg-gray-800 p-4 rounded-lg">Customers: 75</div>
+          </div>
+
+          <div className="bg-gray-800 p-6 rounded-lg h-64">
+            {/* Chart placeholder */}
+            <p className="text-gray-400">Line chart goes here</p>
+          </div>
+
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
+            <table className="w-full text-left">
+              <thead>
+                <tr>
+                  <th className="py-2">Date</th>
+                  <th className="py-2">Customer</th>
+                  <th className="py-2">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>2025-10-15</td>
+                  <td>Acme Corp</td>
+                  <td>$200</td>
+                </tr>
+                <tr>
+                  <td>2025-10-14</td>
+                  <td>Globex</td>
+                  <td>$500</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+Step 4: Design Critique (sample)
+
+✅ Good: clear layout, semantic tags (header, aside, main).
+
+⚠️ Improvement: add ARIA roles for nav and sidebar.
+
+⚠️ Improvement: use <button> instead of <a href="#"> for interactive elements.
+
+⚠️ Improvement: KPI cards should have larger contrast text for accessibility.
+
+Step 5: Figma-like JSON (snippet)
+{
+  "document": {
+    "name": "Sales Dashboard",
+    "children": [
+      {
+        "type": "FRAME", "name": "App",
+        "layout": {"width": 1440, "height": 1024},
+        "children": [
+          {"type":"RECTANGLE","name":"Header","x":0,"y":0,"width":1440,"height":80,"fill":"#1F2937"},
+          {"type":"RECTANGLE","name":"Sidebar","x":0,"y":80,"width":240,"height":944,"fill":"#111827"},
+          {"type":"RECTANGLE","name":"Main","x":240,"y":80,"width":1200,"height":944,"fill":"#1F2937"}
+        ]
+      }
+    ]
+  }
+}
+
+Step 6: Neo4j Log
+
+An event is stored in Neo4j:
+
+(:UIUXEvent {
+  id: "...",
+  description: "Sales dashboard ...",
+  output_type: "React + Tailwind",
+  timestamp: 2025-10-15T12:30:45
+})
+
+
+✅ Result:
+
+You have a React component ready to drop into a frontend project.
+
+A design critique suggests accessibility/usability fixes.
+
+A Figma-like JSON you can later feed into real design tools.
+
+Stored in Neo4j for lineage + collaboration.
+
+👉 Do you also want me to create a demo screenshot mockup (rendering this HTML example visually) so you can see how it looks, or just keep it as code output?
